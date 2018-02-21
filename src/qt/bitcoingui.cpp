@@ -35,6 +35,7 @@
 #include "guiutil.h"
 #include "rpcconsole.h"
 #include "wallet.h"
+#include "termsofuse.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
@@ -546,6 +547,22 @@ void BitcoinGUI::createToolBars()
     secondaryToolbarOrientation(secondaryToolbar->orientation());
 }
 
+void BitcoinGUI::checkTOU()
+{
+    bool agreed_to_tou = false;
+    boost::filesystem::path pathDebug = GetDataDir() / ".agreed_to_tou";
+    if (FILE *file = fopen(pathDebug.string().c_str(), "r")) {
+        file=file;
+        fclose(file);
+        agreed_to_tou = true;
+    }
+
+    if(!agreed_to_tou){
+        TermsOfUse dlg(this);
+        dlg.exec();
+    }
+}
+
 void BitcoinGUI::setClientModel(ClientModel *clientModel)
 {
     this->clientModel = clientModel;
@@ -977,12 +994,33 @@ void BitcoinGUI::showGraph()
 
 void BitcoinGUI::showConfEditor()
 {
-    GUIUtil::openConfigfile();
+    boost::filesystem::path pathConfig = GetConfigFile();
+
+    /* Open denarius.conf with the associated application */
+    if (boost::filesystem::exists(pathConfig)) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(pathConfig.string())));
+	} else {
+		QMessageBox::warning(this, tr("No denarius.conf"),
+        tr("Your denarius.conf does not exist! Please create one in your Denarius data directory."),
+        QMessageBox::Ok, QMessageBox::Ok);
+	}		
+	//GUIUtil::openConfigfile();
+	
 }
 
 void BitcoinGUI::showMNConfEditor()
 {
-    GUIUtil::openMNConfigfile();
+    boost::filesystem::path pathMNConfig = GetMasternodeConfigFile();
+
+    /* Open masternode.conf with the associated application */
+    if (boost::filesystem::exists(pathMNConfig)) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(pathMNConfig.string())));
+	} else {
+		QMessageBox::warning(this, tr("No masternode.conf"),
+        tr("Your masternode.conf does not exist! Please create one in your Denarius data directory."),
+        QMessageBox::Ok, QMessageBox::Ok);
+	}
+    //GUIUtil::openMNConfigfile();
 }
 
 void BitcoinGUI::gotoOverviewPage()
@@ -1223,6 +1261,16 @@ void BitcoinGUI::setEncryptionStatus(int status)
         lockWalletAction->setVisible(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
+    case WalletModel::UnlockedForAnonymizationOnly:
+        labelEncryptionIcon->show();
+        labelEncryptionIcon->setPixmap(QIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+        labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b> for anonymization only"));
+        encryptWalletAction->setChecked(true);
+        changePassphraseAction->setEnabled(true);
+        unlockWalletAction->setVisible(true);
+        lockWalletAction->setVisible(true);
+        encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
+        break;
     case WalletModel::Locked:
         disconnect(labelEncryptionIcon, SIGNAL(clicked()), unlockWalletAction, SLOT(trigger()));
         disconnect(labelEncryptionIcon, SIGNAL(clicked()),   lockWalletAction, SLOT(trigger()));
@@ -1274,7 +1322,7 @@ void BitcoinGUI::unlockWallet()
     if(!walletModel)
         return;
     // Unlock wallet when requested by wallet model
-    if(walletModel->getEncryptionStatus() == WalletModel::Locked)
+    if(walletModel->getEncryptionStatus() == WalletModel::Locked || walletModel->getEncryptionStatus() == WalletModel::UnlockedForAnonymizationOnly)
     {
         AskPassphraseDialog::Mode mode = sender() == unlockWalletAction ?
               AskPassphraseDialog::UnlockStaking : AskPassphraseDialog::Unlock;

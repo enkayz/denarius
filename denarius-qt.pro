@@ -309,6 +309,7 @@ HEADERS += src/qt/bitcoingui.h \
 	src/qt/masternodemanager.h \
     src/qt/addeditadrenalinenode.h \
     src/qt/adrenalinenodeconfigdialog.h \
+    src/qt/termsofuse.h \
     src/version.h \
 	src/bloom.h \
     src/netbase.h \
@@ -351,6 +352,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
 	src/qt/multisigaddressentry.cpp \
     src/qt/multisiginputentry.cpp \
     src/qt/multisigdialog.cpp \
+    src/qt/termsofuse.cpp \
     src/alert.cpp \
 	src/base58.cpp \
     src/version.cpp \
@@ -461,6 +463,7 @@ FORMS += \
 	src/qt/forms/blockbrowser.ui \
 	src/qt/forms/marketbrowser.ui \
 	src/qt/forms/richlist.ui \
+    src/qt/forms/termsofuse.ui \
 	src/qt/forms/darksendconfig.ui \
     src/qt/forms/masternodemanager.ui \
     src/qt/forms/addeditadrenalinenode.ui \
