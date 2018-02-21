@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
+// Copyright (c) 2017-2018 The Denarius developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -886,7 +887,7 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
 
     // Rather not work on nonstandard transactions (unless -testnet)
     string reason;   
-    if (!fTestNet && !IsStandardTx(tx, reason))
+    if (false && !fTestNet && !IsStandardTx(tx, reason))
         return error("AcceptableInputs : nonstandard transaction");
 
     // is it already in the memory pool?
@@ -1196,7 +1197,7 @@ int64_t GetProofOfWorkReward(int nHeight, int64_t nFees)
 		nSubsidy = 1000000 * COIN;  // 10% Premine	
 	else if (pindexBest->nHeight <= FAIR_LAUNCH_BLOCK) // Block 210, Instamine prevention
         nSubsidy = 1 * COIN/2;	
-	else if (pindexBest->nHeight <= 1000000) // Block 1m ~ 3m DNR
+	else if (pindexBest->nHeight <= 1000000) // Block 1m ~ 3m DNR (33% will go to hybrid masternodes)
 		nSubsidy = 3 * COIN;	
 	else if (pindexBest->nHeight <= 2000000) // Block 2m ~ 4m DNR
 		nSubsidy = 4 * COIN;
@@ -1224,10 +1225,8 @@ int64_t GetProofOfStakeReward(int64_t nCoinAge, int64_t nFees)
 
     int64_t nSubsidy;
 
-    if(pindexBest->nHeight <= fTestNet ? POS_STAKE_FIX_BLOCK_TESTNET : POS_STAKE_FIX_BLOCK)
-        nSubsidy = nCoinAge * nRewardCoinYear / 365 / COIN;
-    else
-        nSubsidy = nCoinAge * nRewardCoinYear / 365;
+	//PoS Fixed on v2.0.0.0 DeNaRiUs
+	nSubsidy = nCoinAge * nRewardCoinYear / 365;
 
     if (fDebug && GetBoolArg("-printcreation"))
         printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
@@ -2440,7 +2439,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
 	
 	// ----------- instantX transaction scanning -----------
 
-   
+    if(IsSporkActive(SPORK_1_MASTERNODE_PAYMENTS_ENFORCEMENT_DEFAULT)){
         BOOST_FOREACH(const CTransaction& tx, vtx){
             if (!tx.IsCoinBase()){
                 //only reject blocks when it's based on complete consensus
@@ -2453,15 +2452,35 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
                     }
                 }
             }
-        }
-    
+        } 
+	} else {
+        if(fDebug) { printf("CheckBlock() : skipping transaction locking checks\n"); }
+    }
 
 
     // ----------- masternode payments -----------
+    // Once upon a time, People were really interested in DNR.
+    // So much so, People wanted to bring DNR to the moon. Even Mars, Sooner than the roadster...
+    // The Discord was active, People discussed how they would reach that goal.
+    // There was one person, named Thi3rryzz watching all this from a save distance.
+    // Then, the word MASTERNODES came to the table.
+    // People wanted masternodes... Really Bad. But King Carsen was already busy with the rest of DNR
+    // So Thi3rryzz decided to jump in..
+    // After a lot of: "How much for MN" and "When MN?"
+    // We hope to proudly present you: 
 
+    // ----------- masternode payments -----------
     bool MasternodePayments = false;
 
-    if(nTime > fTestNet ? START_MASTERNODE_PAYMENTS_TESTNET : START_MASTERNODE_PAYMENTS) MasternodePayments = true;
+    if(nTime > fTestNet ? START_MASTERNODE_PAYMENTS_TESTNET : START_MASTERNODE_PAYMENTS){
+         MasternodePayments = true;
+         if(fDebug) printf("CheckBlock() : Masternode payment enabled\n");
+    }
+	
+	if(!IsSporkActive(SPORK_1_MASTERNODE_PAYMENTS_ENFORCEMENT)){
+        MasternodePayments = false;
+        if(fDebug) printf("CheckBlock() : Masternode payment enforcement is off\n");
+    }
    
     if(MasternodePayments)
     {
@@ -2734,9 +2753,41 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         }
     }
 
-    // ppcoin: ask for pending sync-checkpoint if any
-    if (!IsInitialBlockDownload())
+    // Denarius: ask for pending sync-checkpoint if any
+    if (!IsInitialBlockDownload()){
+
         Checkpoints::AskForPendingSyncCheckpoint(pfrom);
+
+        CScript payee;
+
+        if (!fLiteMode && !fImporting && !fReindex && pindexBest->nHeight > Checkpoints::GetTotalBlocksEstimate()){
+            if(masternodePayments.GetBlockPayee(pindexBest->nHeight, payee)){
+                // MAYBE NEEDS TO BE REWORKED
+                //UPDATE MASTERNODE LAST PAID TIME
+                // CMasternode* pmn = mnodeman.Find(vin);
+                // if(pmn != NULL) {
+                //     pmn->nLastPaid = GetAdjustedTime();
+                // }
+
+                printf("ProcessBlock() : Got BlockPayee for block : - %d\n", pindexBest->nHeight);
+            }
+
+            darkSendPool.CheckTimeout();
+            darkSendPool.NewBlock();
+            masternodePayments.ProcessBlock((pindexBest->nHeight)+10);
+
+        }
+/*
+		if(!fLiteMode){
+			if (!fImporting && !fReindex && pindexBest->nHeight > Checkpoints::GetTotalBlocksEstimate()){
+				darkSendPool.CheckTimeout();
+				darkSendPool.NewBlock();
+				masternodePayments.ProcessBlock((pindexBest->nHeight)+10);
+				//printf("ProcessBlock() : Got BlockPayee for block : - %d\n", pindexBest->nHeight);
+			}
+		}
+*/		
+    }
 
     // If don't already have its previous block, shunt it off to holding area until we get it
     if (!mapBlockIndex.count(pblock->hashPrevBlock))
@@ -4155,120 +4206,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
     return true;
 }
-/*
-// requires LOCK(cs_vRecvMsg)
-bool ProcessMessages(CNode* pfrom)
-{
-    //if (fDebug)
-    //    printf("ProcessMessages(%zu messages)\n", pfrom->vRecvMsg.size());
-
-    //
-    // Message format
-    //  (4) message start
-    //  (12) command
-    //  (4) size
-    //  (4) checksum
-    //  (x) data
-    //
-    bool fOk = true;
-
-    std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
-    while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
-        // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
-            break;
-
-        // get next message
-        CNetMessage& msg = *it;
-
-        //if (fDebug)
-        //    printf("ProcessMessages(message %u msgsz, %zu bytes, complete:%s)\n",
-        //            msg.hdr.nMessageSize, msg.vRecv.size(),
-        //            msg.complete() ? "Y" : "N");
-
-        // end, if an incomplete message is found
-        if (!msg.complete())
-            break;
-
-        // at this point, any failure means we can delete the current message
-        it++;
-
-        // Scan for message start
-        if (memcmp(msg.hdr.pchMessageStart, pchMessageStart, sizeof(pchMessageStart)) != 0) {
-            printf("\n\nPROCESSMESSAGE: INVALID MESSAGESTART\n\n");
-            fOk = false;
-            break;
-        }
-
-        // Read header
-        CMessageHeader& hdr = msg.hdr;
-        if (!hdr.IsValid())
-        {
-            printf("\n\nPROCESSMESSAGE: ERRORS IN HEADER %s\n\n\n", hdr.GetCommand().c_str());
-            continue;
-        }
-        string strCommand = hdr.GetCommand();
-
-        // Message size
-        unsigned int nMessageSize = hdr.nMessageSize;
-
-        // Checksum
-        CDataStream& vRecv = msg.vRecv;
-        uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
-        unsigned int nChecksum = 0;
-        memcpy(&nChecksum, &hash, sizeof(nChecksum));
-        if (nChecksum != hdr.nChecksum)
-        {
-            printf("ProcessMessages(%s, %u bytes) : CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n",
-               strCommand.c_str(), nMessageSize, nChecksum, hdr.nChecksum);
-            continue;
-        }
-
-        // Process message
-        bool fRet = false;
-        try
-        {
-            {
-                LOCK(cs_main);
-                fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            }
-            if (fShutdown)
-                break;
-        }
-        catch (std::ios_base::failure& e)
-        {
-            if (strstr(e.what(), "end of data"))
-            {
-                // Allow exceptions from under-length message on vRecv
-                printf("ProcessMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", strCommand.c_str(), nMessageSize, e.what());
-            }
-            else if (strstr(e.what(), "size too large"))
-            {
-                // Allow exceptions from over-long size
-                printf("ProcessMessages(%s, %u bytes) : Exception '%s' caught\n", strCommand.c_str(), nMessageSize, e.what());
-            }
-            else
-            {
-                PrintExceptionContinue(&e, "ProcessMessages()");
-            }
-        }
-        catch (std::exception& e) {
-            PrintExceptionContinue(&e, "ProcessMessages()");
-        } catch (...) {
-            PrintExceptionContinue(NULL, "ProcessMessages()");
-        }
-
-        if (!fRet)
-            printf("ProcessMessage(%s, %u bytes) FAILED\n", strCommand.c_str(), nMessageSize);
-    }
-
-    // In case the connection got shut down, its receive buffer was wiped
-    if (!pfrom->fDisconnect)
-        pfrom->vRecvMsg.erase(pfrom->vRecvMsg.begin(), it);
-
-    return fOk;
-}
-*/
 
 // requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom)
@@ -4583,7 +4520,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 
 int64_t GetMasternodePayment(int nHeight, int64_t blockValue)
 {
-    int64_t ret = blockValue * 1/3; //33%
+    //int64_t ret = blockValue * 1/3; //33%
+	int64_t ret = static_cast<int64_t>(blockValue * 1/3); //33%
 
     return ret;
 }

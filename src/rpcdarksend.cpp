@@ -101,6 +101,22 @@ Value darksend(const Array& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
+Value denominate(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "denominate\n"
+            "Creates compatible inputs for DarkSend"
+            + HelpRequiringPassphrase());
+
+    if (pwalletMain->IsLocked())
+    {
+        return _("Error: Wallet locked, unable to denominate! Use walletpassphrase to unlock. ");
+    }
+	//May need some updating
+    return darkSendPool.Denominate();
+}
+
 
 Value getpoolinfo(const Array& params, bool fHelp)
 {
@@ -126,9 +142,7 @@ Value masternode(const Array& params, bool fHelp)
 
     if (fHelp  ||
         (strCommand != "start" && strCommand != "start-alias" && strCommand != "start-many" && strCommand != "stop" && strCommand != "stop-alias" && strCommand != "stop-many" && strCommand != "list" && strCommand != "list-conf" && strCommand != "count"  && strCommand != "enforce"
-            && strCommand != "debug" && strCommand != "current" && strCommand != "winners" && strCommand != "genkey" && strCommand != "connect" && strCommand != "outputs"))
-        //throw runtime_error(
-            //"masternode <start|start-alias|start-many|stop|stop-alias|stop-many|genkey|list|list-conf|count|debug|current|winners|enforce|outputs> [passphrase]\n");
+            && strCommand != "debug" && strCommand != "current" && strCommand != "winners" && strCommand != "genkey" && strCommand != "connect" && strCommand != "outputs" && strCommand != "status"))
 		throw runtime_error(
 			"masternode \"command\"... ( \"passphrase\" )\n"
 			"Set of commands to execute masternode related actions\n"
@@ -603,6 +617,27 @@ Value masternode(const Array& params, bool fHelp)
         return obj;
 
     }
+
+    if(strCommand == "status")
+    {
+        std::vector<CMasternodeConfig::CMasternodeEntry> mnEntries;
+        mnEntries = masternodeConfig.getEntries();
+
+        CScript pubkey;
+        pubkey = GetScriptForDestination(activeMasternode.pubKeyMasternode.GetID());
+        CTxDestination address1;
+        ExtractDestination(pubkey, address1);
+        CBitcoinAddress address2(address1);
+
+        Object mnObj;
+        mnObj.push_back(Pair("vin", activeMasternode.vin.ToString().c_str()));
+        mnObj.push_back(Pair("service", activeMasternode.service.ToString().c_str()));
+        mnObj.push_back(Pair("status", activeMasternode.status));
+        mnObj.push_back(Pair("pubKeyMasternode", address2.ToString().c_str()));
+        mnObj.push_back(Pair("notCapableReason", activeMasternode.notCapableReason.c_str()));
+        return mnObj;
+    }
+
 
     return Value::null;
 }

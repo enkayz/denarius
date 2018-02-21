@@ -224,7 +224,7 @@ class CDarksendSession
 class CDarkSendPool
 {
 public:
-    static const int MIN_PEER_PROTO_VERSION = 60020;
+    static const int MIN_PEER_PROTO_VERSION = 21213;
 
     // clients entries
     std::vector<CDarkSendEntry> myEntries;
@@ -413,6 +413,9 @@ public:
     bool SendRandomPaymentToSelf();
     // split up large inputs or make fee sized inputs
     bool MakeCollateralAmounts();
+	
+	std::string Denominate();
+	
     bool CreateDenominated(int64_t nTotalValue);
     // get the denominations for a list of outputs (returns a bitshifted integer)
     int GetDenominations(const std::vector<CTxOut>& vout);

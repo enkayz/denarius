@@ -1543,7 +1543,7 @@ void CWallet::AvailableCoinsMN(vector<COutput>& vCoins, bool fOnlyConfirmed, con
                     found = true;
                     if (IsCollateralAmount(pcoin->vout[i].nValue)) continue; // do not use collateral amounts
                     found = !IsDenominatedAmount(pcoin->vout[i].nValue);
-                    if(found && coin_type == ONLY_NONDENOMINATED_NOTMN) found = (pcoin->vout[i].nValue != 5000*COIN); // do not use MN funds 5,000 DNR
+                    if(found && coin_type == ONLY_NONDENOMINATED_NOTMN) found = (pcoin->vout[i].nValue != GetMNCollateral()*COIN); // do not use MN funds 5,000 DNR
                 } else {
                     found = true;
                 }
@@ -2197,7 +2197,7 @@ bool CWallet::SelectCoinsByDenominations(int nDenom, int64_t nValueMin, int64_t 
     {
         //there's no reason to allow inputs less than 1 COIN into DS (other than denominations smaller than that amount)
         if(out.tx->vout[out.i].nValue < 1*COIN && out.tx->vout[out.i].nValue != (.1*COIN)+100) continue;
-        if(fMasterNode && out.tx->vout[out.i].nValue == 5000*COIN) continue; //masternode input 5,000 DNR
+        if(fMasterNode && out.tx->vout[out.i].nValue == GetMNCollateral()*COIN) continue; //masternode input 5,000 DNR
         if(nValueRet + out.tx->vout[out.i].nValue <= nValueMax){
             bool fAccepted = false;
 
@@ -2273,7 +2273,7 @@ bool CWallet::SelectCoinsDark(int64_t nValueMin, int64_t nValueMax, std::vector<
     {
         //there's no reason to allow inputs less than 1 COIN into DS (other than denominations smaller than that amount)
         if(out.tx->vout[out.i].nValue < 1*COIN && out.tx->vout[out.i].nValue != (.1*COIN)+100) continue;
-        if(fMasterNode && out.tx->vout[out.i].nValue == 5000*COIN) continue; //masternode input 5,000 DNR
+        if(fMasterNode && out.tx->vout[out.i].nValue == GetMNCollateral()*COIN) continue; //masternode input 5,000 DNR
 
         if(nValueRet + out.tx->vout[out.i].nValue <= nValueMax){
             CTxIn vin = CTxIn(out.tx->GetHash(),out.i);
@@ -3654,7 +3654,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         ExtractDestination(payee, address1);
         CBitcoinAddress address2(address1);
 
-        printf("Masternode payment to %s\n", address2.ToString().c_str());
+        printf("CreateCoinStake(): Masternode payment to %s\n", address2.ToString().c_str());
     }
 
     int64_t blockValue = nCredit;
@@ -3980,6 +3980,69 @@ int64_t CWallet::GetTotalValue(std::vector<CTxIn> vCoins) {
         }
     }
     return nTotalValue;
+}
+
+std::string CWallet::Denominate()
+{
+
+    int count = 10;
+    int successful = 0;
+    bool done = false;
+
+    if(GetBalance() < 11*COIN){
+        return "To use denominate you must have at least 11DNR with 1 confirmation.";
+    }
+
+    int64_t nFeeRequired;
+	int nChangePos;
+    string strError;
+	//std::string strFailReason;
+    CReserveKey reservekey(this);
+	CCoinControl *coinControl=NULL;
+
+    // create another transaction as collateral for using DarkSend
+    while(!done && count > 0)
+    {        
+
+        CWalletTx wtxNew;
+        CWalletTx wtxNew2;
+    
+        //get 2 new keys
+        CScript scriptNewAddr;
+        CPubKey vchPubKey;
+        assert(reservekey.GetReservedKey(vchPubKey)); // should never fail, as we just unlocked
+        scriptNewAddr.SetDestination(vchPubKey.GetID());
+
+        CScript scriptNewAddr2;
+        CPubKey vchPubKey2;
+        assert(reservekey.GetReservedKey(vchPubKey2)); // should never fail, as we just unlocked
+        scriptNewAddr2.SetDestination(vchPubKey2.GetID());
+
+        vector< pair<CScript, int64_t> > vecSend;
+        for(int i = 1; i <= count; i++) {
+            vecSend.push_back(make_pair(scriptNewAddr, 10*COIN));
+            vecSend.push_back(make_pair(scriptNewAddr2, POOL_FEE_AMOUNT+(0.01*COIN)));
+        }
+
+		if(CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePos, strError, coinControl)){
+        //try to create the larger size input
+        //if(CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, strError, NULL, true)){
+            if (CommitTransaction(wtxNew, reservekey)) {
+                //if successful, create the collateral needed to submit
+                done = true;
+                successful = count;
+            }
+        }
+        count--;
+    }
+
+    ostringstream convert;
+    if(successful == 0) {
+        convert << "An error occurred created DarkSend compatible inputs. Error was " << strError;
+    } else {
+        convert << "Successfully created inputs for " << successful << " DarkSend(s)";
+    }    
+    return convert.str();
 }
 
 DBErrors CWallet::LoadWallet(bool& fFirstRunRet)

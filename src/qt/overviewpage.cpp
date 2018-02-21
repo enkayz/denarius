@@ -22,6 +22,11 @@
 #define DECORATION_SIZE 64
 #define NUM_ITEMS 3
 
+const QString BaseURL = "http://denarius.io/dnrusd.php";
+const QString BaseURL2 = "http://denarius.io/dnrbtc.php";
+double denariusx;
+double dnrbtcx;
+
 class TxViewDelegate : public QAbstractItemDelegate
 {
     Q_OBJECT
@@ -109,8 +114,12 @@ OverviewPage::OverviewPage(QWidget *parent) :
 {
     ui->setupUi(this);
 	
-	ui->frameDarksend->setVisible(false);  // Hide darksend features
-
+	ui->frameDarksend->setVisible(false);
+	
+	//PriceRequest();
+	QObject::connect(&m_nam, SIGNAL(finished(QNetworkReply*)), this, SLOT(parseNetworkResponse(QNetworkReply*)));
+	connect(ui->refreshButton, SIGNAL(pressed()), this, SLOT( PriceRequest()));
+	
     // Recent transactions
     ui->listTransactions->setItemDelegate(txdelegate);
     ui->listTransactions->setIconSize(QSize(DECORATION_SIZE, DECORATION_SIZE));
@@ -129,17 +138,18 @@ OverviewPage::OverviewPage(QWidget *parent) :
 	qDebug() << "Dark Send Status Timer";
         timer = new QTimer(this);
         connect(timer, SIGNAL(timeout()), this, SLOT(darkSendStatus()));
+		//timer->start(333);
 	if(!GetBoolArg("-reindexaddr", false))
             timer->start(60000);
     }
-
-    if(fMasterNode || fLiteMode){
+	
+	if(fMasterNode || fLiteMode){
         ui->toggleDarksend->setText("(" + tr("Disabled") + ")");
         ui->toggleDarksend->setEnabled(false);
     }else if(!fEnableDarksend){
-        ui->toggleDarksend->setText(tr("Start Darksend"));
+        ui->toggleDarksend->setText(tr("Start Darksend Mixing"));
     } else {
-        ui->toggleDarksend->setText(tr("Stop Darksend"));
+        ui->toggleDarksend->setText(tr("Stop Darksend Mixing"));
     }
 
     // init "out of sync" warning labels
@@ -148,6 +158,56 @@ OverviewPage::OverviewPage(QWidget *parent) :
 
     // start with displaying the "out of sync" warnings
     showOutOfSyncWarning(true);
+}
+
+void OverviewPage::PriceRequest()
+{
+	getRequest(BaseURL);
+	getRequest(BaseURL2);
+	updateDisplayUnit(); //Maybe not?
+}
+
+void OverviewPage::getRequest( const QString &urlString )
+{
+    QUrl url ( urlString );
+    QNetworkRequest req ( url );
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=utf-8");
+    m_nam.get(req);
+}
+
+void OverviewPage::parseNetworkResponse(QNetworkReply *finished )
+{
+
+    QUrl what = finished->url();
+
+    if ( finished->error() != QNetworkReply::NoError )
+    {
+        // A communication error has occurred
+        emit networkError( finished->error() );
+        return;
+    }
+	
+if (what == BaseURL) // Denarius Price
+{
+
+    // QNetworkReply is a QIODevice. So we read from it just like it was a file
+    QString denarius = finished->readAll();
+    denariusx = (denarius.toDouble());
+    denarius = QString::number(denariusx, 'f', 2);
+
+	dollarg = denarius;
+}
+if (what == BaseURL2) // Denarius BTC Price
+{
+
+    // QNetworkReply is a QIODevice. So we read from it just like it was a file
+    QString dnrbtc = finished->readAll();
+    dnrbtcx = (dnrbtc.toDouble());
+    dnrbtc = QString::number(dnrbtcx, 'f', 8);
+
+	bitcoing = dnrbtc;
+}
+finished->deleteLater();
 }
 
 void OverviewPage::handleTransactionClicked(const QModelIndex &index)
@@ -340,7 +400,7 @@ void OverviewPage::darkSendStatus()
 
             ui->darksendEnabled->setText(tr("Disabled"));
             ui->darksendStatus->setText("");
-            ui->toggleDarksend->setText(tr("Start Darksend"));
+            ui->toggleDarksend->setText(tr("Start Darksend Mixing"));
         }
 
         return;
@@ -481,9 +541,9 @@ void OverviewPage::toggleDarksend(){
     fEnableDarksend = !fEnableDarksend;
 
     if(!fEnableDarksend){
-        ui->toggleDarksend->setText(tr("Start Darksend"));
+        ui->toggleDarksend->setText(tr("Start Darksend Mixing"));
     } else {
-        ui->toggleDarksend->setText(tr("Stop Darksend"));
+        ui->toggleDarksend->setText(tr("Stop Darksend Mixing"));
 
         /* show darksend configuration if client has defaults set */
 

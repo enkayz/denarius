@@ -234,6 +234,7 @@ extern json_spirit::Value scanforstealthtxns(const json_spirit::Array& params, b
 
 extern json_spirit::Value darksend(const json_spirit::Array& params, bool fHelp); //rpcdarksend.cpp
 extern json_spirit::Value spork(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getpoolinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value masternode(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value smsgenable(const json_spirit::Array& params, bool fHelp);
@@ -253,5 +254,6 @@ extern json_spirit::Value smsgbuckets(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value resetrichlist(const json_spirit::Array& params, bool fHelp); // in rpcwallet.cpp
 extern json_spirit::Value updaterichlist(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getrichlist(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value denominate(const json_spirit::Array& params, bool fHelp);
 
 #endif

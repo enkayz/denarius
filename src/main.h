@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
+// Copyright (c) 2017-2018 The Denarius developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_MAIN_H
@@ -19,13 +20,17 @@
 class CValidationState;
 
 #define START_MASTERNODE_PAYMENTS_TESTNET 1515283200  //Sat, 07 Jan 2018 00:00:00 GMT
-#define START_MASTERNODE_PAYMENTS 1515900783  //2018-1-14 03:33:03 GMT
+#define START_MASTERNODE_PAYMENTS 1520985600  //Wed, 14 Mar 2018 00:00:00 GMT
+
+#define START_POW_MASTERNODE_PAYMENTS_TESTNET 1519102820 //Tue, 20 Feb 2018 05:00:00 GMT
+#define START_POW_MASTERNODE_PAYMENTS 1520985600  //Wed, 14 Mar 2018 00:00:00 GMT
 
 #define POS_STAKE_FIX_BLOCK 9900000 //Needs to be worked out still
 #define POS_STAKE_FIX_BLOCK_TESTNET 20000
 
 static const int64_t DARKSEND_COLLATERAL = (5000*COIN); // 5,000 DNR
 static const int64_t DARKSEND_FEE = (0.010000*COIN); //0.01 DNR
+static const int64_t POOL_FEE_AMOUNT = (0.1*COIN); //0.1 DNR
 static const int64_t DARKSEND_POOL_MAX = (11000*COIN); //11,000 DNR
 
 #define MESSAGE_START_SIZE 4
@@ -104,6 +109,8 @@ inline int64_t PastDrift(int64_t nTime)   { return nTime - 10 * 60; } // up to 1
 inline int64_t FutureDrift(int64_t nTime) { return nTime + 10 * 60; } // up to 10 minutes from the future
 
 //inline unsigned int GetTargetSpacing(int nHeight) { return IsProtocolV2(nHeight) ? 60 : 60; }
+
+inline int64_t GetMNCollateral() { return 5000; }
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;

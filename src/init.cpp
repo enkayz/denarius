@@ -2,6 +2,9 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+    
+#include "init.h"
+#include "main.h"
 #include "txdb.h"
 #include "walletdb.h"
 #include "bitcoinrpc.h"
@@ -32,7 +35,7 @@
 using namespace std;
 using namespace boost;
 
-CWallet* pwalletMain;
+CWallet* pwalletMain = NULL;
 CClientUIInterface uiInterface;
 bool fConfChange;
 bool fEnforceCanonical;
@@ -374,6 +377,7 @@ std::string HelpMessage()
 		"\n" + _("InstantX options:") + "\n" +
 		"  -enableinstantx=<n>    " + _("Enable instantx, show confirmations for locked transactions (bool, default: true)") + "\n" +
 		"  -instantxdepth=<n>     " + _("Show N confirmations for a successfully locked transaction (0-9999, default: 1)") + "\n" +
+		
         "\n" + _("Secure messaging options:") + "\n" +
         "  -nosmsg                                  " + _("Disable secure messaging.") + "\n" +
         "  -debugsmsg                               " + _("Log extra debug messages.") + "\n" +
@@ -1058,6 +1062,8 @@ bool AppInit2(boost::thread_group& threadGroup)
     }
 
     printf("fLiteMode %d\n", fLiteMode);
+	printf("fEnableDarksend %d\n", fEnableDarksend);
+	printf("fMasterNode %d\n", fMasterNode);
     printf("nInstantXDepth %d\n", nInstantXDepth);
     printf("Darksend rounds %d\n", nDarksendRounds);
     printf("Anonymize Denarius Amount %d\n", nAnonymizeDenariusAmount);
