@@ -3469,6 +3469,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         return false;
     
     int64_t nCredit = 0;
+    if (fDebug) printf("CreateCoinStake::Start nCredit = %" PRId64 "\n",nCredit);
     CScript scriptPubKeyKernel;
     CTxDB txdb("r");
     BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
@@ -3555,12 +3556,16 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
 
                 txNew.nTime -= n;
                 txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
+                if (fDebug) printf("CreateCoinStake::pushing new txIn with %lld value\n",pcoin.first->vout[pcoin.second].nValue);
                 nCredit += pcoin.first->vout[pcoin.second].nValue;
+                if (fDebug) printf("CreateCoinStake::nCredit = %" PRId64 "\n",nCredit);
                 vwtxPrev.push_back(pcoin.first);
                 txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
 
                 if (GetWeight(block.GetBlockTime(), (int64_t)txNew.nTime) < nStakeSplitAge)
                     txNew.vout.push_back(CTxOut(0, scriptPubKeyOut)); //split stake
+                else
+                    if (fDebug) printf("CreateCoinStake(): Not splitting the inputs.\n");
                 if (fDebug && GetBoolArg("-printcoinstake"))
                     printf("CreateCoinStake : added kernel type=%d\n", whichType);
                 fKernelFound = true;
@@ -3575,6 +3580,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     if (nCredit == 0 || nCredit > nBalance - nReserveBalance)
         return false;
     
+    if (fDebug) printf("CreateCoinStake(): Adding more inputs...\n");
     BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
     {
         // Attempt to add more inputs
@@ -3601,10 +3607,14 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                 continue;
 
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
+            if (fDebug) printf("CreateCoinStake::pushing new txIn with %lld value\n",pcoin.first->vout[pcoin.second].nValue);
             nCredit += pcoin.first->vout[pcoin.second].nValue;
+            if (fDebug) printf("CreateCoinStake::nCredit = %" PRId64 "\n",nCredit);
             vwtxPrev.push_back(pcoin.first);
         }
     }
+
+    if (fDebug) printf("CreateCoinStake::nCredit before nReward = %lld\n",nCredit);
 
     // Calculate coin age reward
     int64_t nReward;
@@ -3620,8 +3630,10 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
 
         nCredit += nReward;
     }
-	
-	// Masternode Payments
+    if (fDebug) printf("CreateCoinStake::nReward = %" PRId64 "\n",nReward);
+    if (fDebug) printf("CreateCoinStake::nCredit Total = %" PRId64 "\n",nCredit);
+
+    // Masternode Payments
     int payments = 1;
     // start masternode payments
     bool bMasterNodePayment = false;
@@ -3645,31 +3657,29 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                 if(winningNode >= 0){
                     payee =GetScriptForDestination(vecMasternodes[winningNode].pubkey.GetID());
                 } else {
-                    printf("CreateCoinStake: Failed to detect masternode to pay\n");
+                    if (fDebug) printf("CreateCoinStake: Failed to detect masternode to pay\n");
                     hasPayment = false;
+                    return error("CreateCoinStake: No masternodes to pay. Aborting stake!\n");
                 }
         }
     }
 
-    if(hasPayment){
-        payments = txNew.vout.size() + 1;
-        txNew.vout.resize(payments);
-
-        txNew.vout[payments-1].scriptPubKey = payee;
-        txNew.vout[payments-1].nValue = 0;
-
-        CTxDestination address1;
-        ExtractDestination(payee, address1);
-        CBitcoinAddress address2(address1);
-
-        printf("CreateCoinStake(): Masternode payment to %s\n", address2.ToString().c_str());
-    }
 
     int64_t blockValue = nCredit;
     int64_t masternodePayment = GetMasternodePayment(pindexPrev->nHeight+1, nReward);
 
+    if (fDebug) printf("CreateCoinStake(): Paying masternode %" PRId64 " of  %" PRId64 " reward coins. Total transaction value:  %" PRId64 "\n",masternodePayment,nReward,blockValue);
 
-    // Set output amount
+    txNew.vout.push_back(CTxOut(0,payee)); // add another vout to pay the masternode with
+    payments = txNew.vout.size();
+
+    CTxDestination address1;
+    ExtractDestination(payee, address1);
+    CBitcoinAddress address2(address1);
+
+    if (fDebug) printf("CreateCoinStake(): Masternode payment to %s with %d TxOuts\n", address2.ToString().c_str(),payments);
+
+    // Set output amounts
     if (!hasPayment && txNew.vout.size() == 3) // 2 stake outputs, stake was split, no masternode payment
     {
         txNew.vout[1].nValue = (blockValue / 2 / CENT) * CENT;
@@ -3677,20 +3687,27 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     }
     else if(hasPayment && txNew.vout.size() == 4) // 2 stake outputs, stake was split, plus a masternode payment
     {
+        if (fDebug) printf("CreateCoinStake(): Paying masternode (vout[%d]) %" PRId64 " coins\n", payments-1, masternodePayment);
         txNew.vout[payments-1].nValue = masternodePayment;
         blockValue -= masternodePayment;
+        if (fDebug) printf("CreateCoinStake(): Remaining block value:  %" PRId64 "\n", blockValue);
+        if (fDebug) printf("CreateCoinStake(): Paying ourselves half of the coins ( %" PRId64 ")\n",(blockValue / 2 / CENT) * CENT);
         txNew.vout[1].nValue = (blockValue / 2 / CENT) * CENT;
+        if (fDebug) printf("CreateCoinStake(): Paying ourselves the rest of the coins ( %" PRId64 ")\n", blockValue - txNew.vout[1].nValue);
         txNew.vout[2].nValue = blockValue - txNew.vout[1].nValue;
     }
     else if(!hasPayment && txNew.vout.size() == 2) // only 1 stake output, was not split, no masternode payment
         txNew.vout[1].nValue = blockValue;
     else if(hasPayment && txNew.vout.size() == 3) // only 1 stake output, was not split, plus a masternode payment
     {
+        if (fDebug) printf("CreateCoinStake(): Paying masternode (vout[%d]) %" PRId64 " coins\n", payments-1, masternodePayment);
         txNew.vout[payments-1].nValue = masternodePayment;
         blockValue -= masternodePayment;
+        if (fDebug) printf("CreateCoinStake(): Paying ourselves (vout[1]) the rest of the coins ( %" PRId64 ")\n", blockValue);
         txNew.vout[1].nValue = blockValue;
     }
 
+    if (fDebug) printf("CreateCoinStake(): Signing the stake...\n");
     // Sign
     int nIn = 0;
     BOOST_FOREACH(const CWalletTx* pcoin, vwtxPrev)
