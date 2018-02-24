@@ -3646,7 +3646,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                     payee =GetScriptForDestination(vecMasternodes[winningNode].pubkey.GetID());
                 } else {
                     printf("CreateCoinStake: Failed to detect masternode to pay\n");
-                    hasPayment = false;
+                    return error("CreateCoinStake(): Cannot detect a masternode to pay. Aborting stake!");
                 }
         }
     }
