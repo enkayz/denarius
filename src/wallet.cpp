@@ -3645,8 +3645,13 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                 if(winningNode >= 0){
                     payee =GetScriptForDestination(vecMasternodes[winningNode].pubkey.GetID());
                 } else {
-                    printf("CreateCoinStake: Failed to detect masternode to pay\n");
-                    return error("CreateCoinStake(): Cannot detect a masternode to pay. Aborting stake!");
+                    // pay the burn address if it can't detect
+                    if (fDebug) printf("CreateCoinStake: Failed to detect masternode to pay, burning coins..\n");
+                    if (fTestNet) std::string burnAddress = "8TestXXXXXXXXXXXXXXXXXXXXXXXXbCvpq";
+                    else std::string burnAddress = "DNRXXXXXXXXXXXXXXXXXXXXXXXXXZeeDTw";
+                    CBitcoinAddress burnAddr;
+                    burnAddr.SetString(burnAddress);
+                    payee = GetScriptForDestination(burnAddr.Get());
                 }
         }
     }
