@@ -71,15 +71,70 @@ Value getpeerinfo(const Array& params, bool fHelp)
 Value addnode(const Array& params, bool fHelp)
 {
     string strCommand;
+    if (params.size() == 1)
+        strCommand = params[0].get_str();
     if (params.size() == 2)
         strCommand = params[1].get_str();
-    if (fHelp || params.size() != 2 ||
-        (strCommand != "onetry" && strCommand != "add" && strCommand != "remove"))
+    if (fHelp ||
+            (   (params.size() == 2 && (strCommand != "onetry" && strCommand != "add" && strCommand != "remove" && strCommand != "list")) ||
+                (params.size() == 1 && strCommand != "list") ||
+                (params.size() > 2 || params.size() == 0)
+            )
+        )
         throw runtime_error(
-            "addnode <node> <add|remove|onetry>\n"
+            "addnode <list|node> <add|remove|onetry>\n"
             "Attempts add or remove <node> from the addnode list or try a connection to <node> once.");
 
     string strNode = params[0].get_str();
+
+    if (strCommand == "list")
+    {
+        Object result;
+        Object nodes;
+        int nodesFound;
+        nodesFound = 0;
+        vector<CNodeStats> vstats;
+        CopyNodeStats(vstats);
+
+        list<string> lAddresses(0);
+        {
+            LOCK(cs_vAddedNodes);
+            BOOST_FOREACH(string& strAddNode, vAddedNodes)
+                lAddresses.push_back(strAddNode);
+        }
+
+        BOOST_FOREACH(string& strAddedNode, lAddresses)
+        {
+            Object noderesult;
+            bool found = false;
+            BOOST_FOREACH(const CNodeStats& stats, vstats)
+            {
+                if (stats.addrName == strAddedNode)
+                {
+                    nodesFound++;
+                    found = true;
+                    noderesult.push_back(Pair("addr", stats.addrName));
+                    noderesult.push_back(Pair("services", strprintf("%08"PRIx64, stats.nServices)));
+                    noderesult.push_back(Pair("lastsend", (int64_t)stats.nLastSend));
+                    noderesult.push_back(Pair("lastrecv", (int64_t)stats.nLastRecv));
+                    noderesult.push_back(Pair("conntime", (int64_t)stats.nTimeConnected));
+                    noderesult.push_back(Pair("version", stats.nVersion));
+                    noderesult.push_back(Pair("subver", stats.strSubVer));
+                    noderesult.push_back(Pair("inbound", stats.fInbound));
+                    noderesult.push_back(Pair("startingheight", stats.nStartingHeight));
+                    noderesult.push_back(Pair("banscore", stats.nMisbehavior));
+                }
+            }
+            if (found)
+                nodes.push_back(Pair(strAddedNode, noderesult));
+            else
+                nodes.push_back(Pair(strAddedNode, "not connected"));
+        }
+
+        result.push_back(Pair("result", nodesFound));
+        result.push_back(Pair("nodes", nodes));
+        return result;
+    }
 
     if (strCommand == "onetry")
     {
