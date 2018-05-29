@@ -85,7 +85,9 @@ void SetReachable(enum Network net, bool fFlag = true);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
 
 extern std::vector<std::string> vAddedNodes;
+extern std::vector<std::string> vPoolNodes;
 extern CCriticalSection cs_vAddedNodes;
+extern CCriticalSection cs_vPoolNodes;
 
 enum
 {

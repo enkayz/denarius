@@ -77,6 +77,9 @@ CCriticalSection cs_setservAddNodeAddresses;
 vector<std::string> vAddedNodes;
 CCriticalSection cs_vAddedNodes;
 
+vector<std::string> vPoolNodes;
+CCriticalSection cs_vPoolNodes;
+
 static CSemaphore *semOutbound = NULL;
 
 // Signals for message handling
@@ -992,6 +995,7 @@ void ThreadSocketHandler2(void* parg)
             socklen_t len = sizeof(sockaddr);
             SOCKET hSocket = accept(hListenSocket, (struct sockaddr*)&sockaddr, &len);
             CAddress addr;
+            bool allowNode;
             int nInbound = 0;
 
             if (hSocket != INVALID_SOCKET)
@@ -1005,13 +1009,22 @@ void ThreadSocketHandler2(void* parg)
                         nInbound++;
             }
 
+            {
+                LOCK(cs_vPoolNodes);
+                BOOST_FOREACH(string& strPoolNode, vPoolNodes)
+                {
+                    if (addr.ToString() == strPoolNode)
+                        allowNode = true; // allow pool nodes to connect always
+                }
+            }
+
             if (hSocket == INVALID_SOCKET)
             {
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK)
                     printf("socket error accept failed: %d\n", nErr);
             }
-            else if (nInbound >= GetArg("-maxconnections", 125) - MAX_OUTBOUND_CONNECTIONS)
+            else if (!allowNode && (nInbound >= GetArg("-maxconnections", 125) - vPoolNodes.size() - MAX_OUTBOUND_CONNECTIONS)) // keep slots open for poolnodes
             {
                 closesocket(hSocket);
             }
@@ -1719,10 +1732,20 @@ void ThreadOpenAddedConnections2(void* parg)
         LOCK(cs_vAddedNodes);
         vAddedNodes = mapMultiArgs["-addnode"];
     }
+    {
+        LOCK(cs_vPoolNodes);
+        vPoolNodes = mapMultiArgs["-poolnode"];
+    }
 
     if (HaveNameProxy()) {
         while(true) {
             list<string> lAddresses(0);
+            {
+                LOCK(cs_vPoolNodes);
+                BOOST_FOREACH(string& strAddNode, vPoolNodes)
+                    lAddresses.push_back(strAddNode);
+            }
+
             {
                 LOCK(cs_vAddedNodes);
                 BOOST_FOREACH(string& strAddNode, vAddedNodes)
@@ -1747,6 +1770,11 @@ void ThreadOpenAddedConnections2(void* parg)
     for (unsigned int i = 0; true; i++)
     {
         list<string> lAddresses(0);
+        {
+            LOCK(cs_vPoolNodes);
+            BOOST_FOREACH(string& strAddNode, vPoolNodes)
+                lAddresses.push_back(strAddNode);
+        }
         {
             LOCK(cs_vAddedNodes);
             BOOST_FOREACH(string& strAddNode, vAddedNodes)
