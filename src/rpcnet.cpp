@@ -109,6 +109,96 @@ Value addnode(const Array& params, bool fHelp)
 
     return Value::null;
 }
+
+Value poolnode(const Array& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() == 1)
+        strCommand = params[0].get_str();
+    if (params.size() == 2)
+        strCommand = params[1].get_str();
+    if (fHelp ||
+               (   (params.size() == 2 && (strCommand != "onetry" && strCommand != "add" && strCommand != "remove" && strCommand != "list")) ||
+                   (params.size() == 1 && strCommand != "list") ||
+                   (params.size() > 2 || params.size() == 0)
+               )
+           )
+        throw runtime_error(
+            "poolnode <node> <add|remove>\n"
+            "Attempts add or remove <node> from the pool node list.");
+
+    string strNode = params[0].get_str();
+
+    if (strCommand == "list")
+    {
+        Object result;
+        Object nodes;
+        int nodesFound;
+        nodesFound = 0;
+        vector<CNodeStats> vstats;
+        CopyNodeStats(vstats);
+
+        list<string> lAddresses(0);
+        {
+            LOCK(cs_vPoolNodes);
+            BOOST_FOREACH(string& strAddNode, vPoolNodes)
+                lAddresses.push_back(strAddNode);
+        }
+
+        BOOST_FOREACH(string& strAddedNode, lAddresses)
+        {
+            Object noderesult;
+            bool found = false;
+            BOOST_FOREACH(const CNodeStats& stats, vstats)
+            {
+                if (stats.addrName == strAddedNode)
+                {
+                    nodesFound++;
+                    found = true;
+                    noderesult.push_back(Pair("addr", stats.addrName));
+                    noderesult.push_back(Pair("services", strprintf("%08"PRIx64, stats.nServices)));
+                    noderesult.push_back(Pair("lastsend", (int64_t)stats.nLastSend));
+                    noderesult.push_back(Pair("lastrecv", (int64_t)stats.nLastRecv));
+                    noderesult.push_back(Pair("conntime", (int64_t)stats.nTimeConnected));
+                    noderesult.push_back(Pair("version", stats.nVersion));
+                    noderesult.push_back(Pair("subver", stats.strSubVer));
+                    noderesult.push_back(Pair("inbound", stats.fInbound));
+                    noderesult.push_back(Pair("startingheight", stats.nStartingHeight));
+                    noderesult.push_back(Pair("banscore", stats.nMisbehavior));
+                }
+            }
+            if (found)
+                nodes.push_back(Pair(strAddedNode, noderesult));
+            else
+                nodes.push_back(Pair(strAddedNode, "not connected"));
+        }
+
+        result.push_back(Pair("result", nodesFound));
+        result.push_back(Pair("nodes", nodes));
+        return result;
+    }
+
+    LOCK(cs_vPoolNodes);
+    vector<string>::iterator it = vPoolNodes.begin();
+    for(; it != vPoolNodes.end(); it++)
+        if (strNode == *it)
+            break;
+
+    if (strCommand == "add")
+    {
+        if (it != vPoolNodes.end())
+            throw JSONRPCError(-23, "Error: Node already added");
+        vPoolNodes.push_back(strNode);
+    }
+    else if(strCommand == "remove")
+    {
+        if (it == vPoolNodes.end())
+            throw JSONRPCError(-24, "Error: Node has not been added.");
+        vPoolNodes.erase(it);
+    }
+
+    return Value::null;
+}
  
 // ppcoin: send alert.  
 // There is a known deadlock situation with ThreadMessageHandler
