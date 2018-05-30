@@ -246,6 +246,18 @@ Value masternode(const Array& params, bool fHelp)
                 obj.push_back(Pair(mn.addr.ToString().c_str(),       (int64_t)(mn.lastTimeSeen - mn.now)));
             } else if (strCommand == "rank") {
                 obj.push_back(Pair(mn.addr.ToString().c_str(),       (int)(GetMasternodeRank(mn, pindexBest->nHeight))));
+            } else if (strCommand == "full") {
+                Object list;
+                list.push_back(Pair("active",       (int)mn.IsEnabled()));
+                list.push_back(Pair("txhash",       mn.vin.prevout.hash.ToString().c_str()));
+                list.push_back(Pair("txindex",       mn.vin.prevout.n);
+                list.push_back(Pair("address",       address2.ToString().c_str()));
+                list.push_back(Pair("protocol",       (int64_t)mn.protocolVersion));
+                list.push_back(Pair("lastseen",       (int64_t)mn.lastTimeSeen));
+                list.push_back(Pair("activeseconds",       (int64_t)(mn.lastTimeSeen - mn.now)));
+                list.push_back(Pair("rank",       (int)(GetMasternodeRank(mn, pindexBest->nHeight))));
+                list.push_back(Pair("lastpaid",       mn.nBlockLastPaid));
+                obj.push_back(Pair(mn.addr.ToString().c_str(), list));
             }
         }
         return obj;
