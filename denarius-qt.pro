@@ -195,6 +195,16 @@ contains(USE_O3, 1) {
     QMAKE_CFLAGS += -O3
 }
 
+contains(USE_DEBUG_FLAGS, 1) {
+    QMAKE_CXXFLAGS -= -O3
+    QMAKE_CFLAGS -= -O3
+    QMAKE_CXXFLAGS += -gstabs+ -Og -fno-omit-frame-pointer
+    QMAKE_CFLAGS += -gstabs+ -Og -fno-omit-frame-pointer
+    QMAKE_LFLAGS += -gstabs+
+    QMAKE_CXXFLAGS_DEBUG += -gstabs+
+    QMAKE_CFLAGS_DEBUG += -gstabs+
+}
+
 *-g++-32 {
     message("32 platform, adding -msse2 flag")
 
