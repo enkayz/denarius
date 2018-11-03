@@ -271,6 +271,7 @@ public:
     
     int64_t nLastSendEmpty;
     int64_t nTimeConnected;
+    int64_t nLastDseg;
     CAddress addr;
     std::string addrName;
     CService addrLocal;
@@ -373,6 +374,8 @@ public:
         nPingUsecTime = 0;
         fPingQueued = false;
         fDarkSendMaster = false;
+        fRelayTxes = false;
+        nLastDseg = GetTime();
 
         // Be shy and don't send version until we hear
         if (hSocket != INVALID_SOCKET && !fInbound)
