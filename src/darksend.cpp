@@ -986,13 +986,13 @@ void ThreadCheckDarkSendPool(void* parg)
                 {
                     if (pnode->nVersion >= darkSendPool.PROTOCOL_VERSION) {
 
-                        //keep track of who we've asked for the list
-                        if(pnode->HasFulfilledRequest("mnsync"))
+                        //keep track of who we've asked for the list, ask peers each 3 hours
+                        if(pnode->HasFulfilledRequest("mnsync") && (pnode->nLastDseg < GetTime()+(60*60*3)))
                         {
                             continue;
                         } else {
                             pnode->FulfilledRequest("mnsync");
-                            printf("Asking for Masternode list from %s\n",pnode->addr.ToStringIPPort().c_str());
+                            printf("Asking for Masternode list (current count %d/%d) from %s\n", vecMasternodes.size(), mnCount, pnode->addr.ToStringIPPort().c_str());
 
                             pnode->PushMessage("dseg", CTxIn()); //request full mn list
                             pnode->PushMessage("mnget"); //sync payees
