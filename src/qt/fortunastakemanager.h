@@ -12,6 +12,7 @@ namespace Ui {
 }
 class ClientModel;
 class WalletModel;
+class CBlockIndex;
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
