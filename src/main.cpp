@@ -2699,7 +2699,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                                                 mapOrphanBlocks.insert(make_pair(pblock2->GetHash(), pblock2));
                                                 mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
 
-                                                return error("CheckBlock-POW() : Fortunastake overpayment detected, rejecting block. rank:%d payRate:%d",rank,FormatMoney(mn.payRate).c_str());
+                                                return error("CheckBlock-POW() : Fortunastake overpayment detected, rejecting block. payValue:%s payRate:%s",FormatMoney(mn.payRate).c_str(),FormatMoney(mn.payRate).c_str());
                                             } else
                                             {
                                                 if (fDebug) printf("WARNING: This fortunastake payment is too aggressive and will not be accepted after block %d\n", MN_ENFORCEMENT_ACTIVE_HEIGHT);
