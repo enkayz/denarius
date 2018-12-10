@@ -1021,7 +1021,7 @@ void ThreadCheckForTunaPool(void* parg)
 
             //if we're low on peers, let's connect to some random ipv4 fortunastakes. ipv6 probably won't route anyway
             if (GetArg("-maxconnections", 125) > 16 && vNodes.size() < min(25, (int)GetArg("-maxconnections", 125)) && vecFortunastakes.size() > 25) {
-                int x = 25 - vNodes.size();
+                int x = 5; //connect to 5 random nodes over 10 secs
                 for (int i = x; i-- > 0; ) {
                     int fs = rand() % vecFortunastakes.size();
                     CService addr = vecFortunastakes[fs].addr;
@@ -1032,7 +1032,8 @@ void ThreadCheckForTunaPool(void* parg)
                             printf("error connecting to fortunastake at %s\n",addr.ToStringIPPort().c_str());
                         }
                     }
-                    //MilliSleep(250); // 250 msecs * 50 nodes = 42.5sec, just in time to run this again if needed!
+                    MilliSleep(2000); // 250 msecs * 50 nodes = 42.5sec, just in time to run this again if needed!
+                    if (fShutdown) break;
                 }
 
             }

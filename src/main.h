@@ -147,6 +147,7 @@ extern bool fEnforceCanonical;
 extern bool fMinimizeCoinAge;
 
 extern int64_t nMinTxFee;
+extern int64_t timeSynced;
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const uint64_t nMinDiskSpace = 52428800; //52 MB Minimum, Raise?

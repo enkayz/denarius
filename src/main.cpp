@@ -65,6 +65,7 @@ bool fReindex = false;
 bool fAddrIndex = false;
 
 bool FortunaReorgBlock = false;
+int64_t timeSynced;
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
 
@@ -1691,7 +1692,10 @@ bool IsInitialBlockDownload()
             pindexBest->GetBlockTime() < (GetTime() - 300)); // last block is more than 5 minutes old
 
     if (state)
+    {
         lockIBDState = true;
+        timeSynced = GetAdjustedTime();
+    }
     return state;
 }
 
@@ -2546,20 +2550,20 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                                     {
                                         int64_t value = vtx[1].vout[i].nValue;
                                         int lastPaid = mn.nBlockLastPaid;
-                                        int vinAge = mn.GetFortunastakeInputAge(pindex);
-                                        int rank = (GetFortunastakeRank(mn, pindex));
-                                        int maxrank = mnCount-(mnCount/10);
-                                        if (fDebug) printf("CheckBlock-POS() : Fortunastake PoS payee found at block %d: %s who got paid %s D rate:%d age: %d, rank %d\n", pindex->nHeight, address2.ToString().c_str(), FormatMoney(value).c_str(), mn.payRate, vinAge, rank);
+                                        //int vinAge = mn.GetFortunastakeInputAge(pindex);
+                                        //int rank = (GetFortunastakeRank(mn, pindex));
+                                        //int maxrank = mnCount-(mnCount/10);
+                                        if (fDebug) printf("CheckBlock-POS() : Fortunastake PoS payee found at block %d: %s who got paid %s D rate:%d\n", pindex->nHeight, address2.ToString().c_str(), FormatMoney(value).c_str(), mn.payRate);
 
-                                        if(vinAge < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)) // if MN is too new
-                                        {
-                                            if (pindexBest->nHeight >= MN_ENFORCEMENT_ACTIVE_HEIGHT) {
-                                                return error("CheckBlock-POS() : Fortunastake has only %d confirmations (requires %d) - rejecting block.", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY);
-                                            } else {
-                                                if (fDebug) printf("WARNING: Fortunastake has only %d confirmations (requires %d) and will not be accepted after block %d\n", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY, MN_ENFORCEMENT_ACTIVE_HEIGHT);
-                                            }
-                                            break;
-                                        }
+//                                        if(vinAge < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)) // if MN is too new
+//                                        {
+//                                            if (pindexBest->nHeight >= MN_ENFORCEMENT_ACTIVE_HEIGHT) {
+//                                                return error("CheckBlock-POS() : Fortunastake has only %d confirmations (requires %d) - rejecting block.", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY);
+//                                            } else {
+//                                                if (fDebug) printf("WARNING: Fortunastake has only %d confirmations (requires %d) and will not be accepted after block %d\n", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY, MN_ENFORCEMENT_ACTIVE_HEIGHT);
+//                                            }
+//                                            break;
+//                                        }
 
                                         if (!fIsInitialDownload) {
                                             if (!CheckFSPayment(pindex, vtx[1].vout[i].nValue, mn)) // if MN is being paid and it's bottom 50% ranked, don't let it be paid.
@@ -2669,21 +2673,22 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                                 if (payee == pubScript)
                                 {
                                     int lastPaid = mn.nBlockLastPaid;
-                                    int vinAge = mn.GetFortunastakeInputAge(pindex);
-                                    int rank = (GetFortunastakeRank(mn, pindex));
-                                    int maxrank = mnCount - (mnCount/10);
+                                    //int vinAge = mn.GetFortunastakeInputAge(pindex);
+                                    //int rank = (GetFortunastakeRank(mn, pindex));
+                                    //int maxrank = mnCount - (mnCount/10);
 
-                                    if (fDebug) printf("CheckBlock-POW() : Fortunastake PoW payee found at block %d: %s who got paid %s D rate:%d age: %d, rank %d\n", pindex->nHeight+1, address2.ToString().c_str(), FormatMoney(vtx[0].vout[i].nValue).c_str(), FormatMoney(mn.payRate).c_str(), vinAge, rank);
+                                    if (fDebug) printf("CheckBlock-POW() : Fortunastake PoW payee found at block %d: %s who got paid %s D rate:%d\n", pindex->nHeight, address2.ToString().c_str(), FormatMoney(vtx[0].vout[i].nValue).c_str(), FormatMoney(mn.payRate).c_str());
+// not needed here anymore, 'mn' wont be in vector if this failed
 
-                                    if(vinAge < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)) // if MN is too new
-                                    {
-                                        if (pindexBest->nHeight >= MN_ENFORCEMENT_ACTIVE_HEIGHT) {
-                                            return error("CheckBlock-POW() : Fortunastake has only %d confirmations (requires %d) - rejecting block.", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY);
-                                        } else {
-                                            if (fDebug) printf("WARNING: Fortunastake has only %d confirmations (requires %d) and will not be accepted after block %d\n", vinAge ,FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY, MN_ENFORCEMENT_ACTIVE_HEIGHT);
-                                        }
-                                        break;
-                                    }
+//                                    if(vinAge < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)) // if MN is too new
+//                                    {
+//                                        if (pindexBest->nHeight >= MN_ENFORCEMENT_ACTIVE_HEIGHT) {
+//                                            return error("CheckBlock-POW() : Fortunastake has only %d confirmations (requires %d) - rejecting block.", vinAge, FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY);
+//                                        } else {
+//                                            if (fDebug) printf("WARNING: Fortunastake has only %d confirmations (requires %d) and will not be accepted after block %d\n", vinAge ,FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY, MN_ENFORCEMENT_ACTIVE_HEIGHT);
+//                                        }
+//                                        break;
+//                                    }
 
                                     if (!fIsInitialDownload) {
                                         if (!CheckFSPayment(pindex, vtx[0].vout[i].nValue, mn)) // if MN is being paid and it's bottom 50% ranked, don't let it be paid.

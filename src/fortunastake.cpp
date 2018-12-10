@@ -174,14 +174,14 @@ void ProcessMessageFortunastake(CNode* pfrom, std::string& strCommand, CDataStre
         // make sure it's still unspent
         //  - this is checked later by .check() in many places and by ThreadCheckForTunaPool()
         std::string vinError;
-        if(CheckFortunastakeVin(vin,vinError)){
+        if(CheckFortunastakeVin(vin,vinError,pindexBest)){
             if (fDebugFS && fDebugNet) printf("dsee - Accepted input for fortunastake entry %i %i\n", count, current);
 
-            if(GetInputAge(vin, pindexBest) < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)){
-                if (fDebugFS && fDebugNet) printf("dsee - Input must have least %d confirmations\n", (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS));
-                Misbehaving(pfrom->GetId(), 20);
-                return;
-            }
+//            if(GetInputAge(vin, pindexBest) < (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS)){
+//                if (fDebugFS && fDebugNet) printf("dsee - Input must have least %d confirmations\n", (nBestHeight > BLOCK_START_FORTUNASTAKE_DELAYPAY ? FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY : FORTUNASTAKE_MIN_CONFIRMATIONS));
+//                Misbehaving(pfrom->GetId(), 20);
+//                return;
+//            }
 
             // use this as a peer
             addrman.Add(CAddress(addr), pfrom->addr, 2*60*60);
@@ -325,11 +325,12 @@ void ProcessMessageFortunastake(CNode* pfrom, std::string& strCommand, CDataStre
             if(mn.addr.IsRFC1918()) continue; //local network
 
             if(vin == CTxIn()){
-                mn.Check(true);
-                if(mn.IsEnabled()) {
+                // mn.Check(true);
+                //if(mn.IsEnabled()) {
+                // don't check anything, this gets done every block anyway.
                     if(fDebugFS && fDebugNet) printf("dseg - Sending fortunastake entry - %s \n", mn.addr.ToString().c_str());
                     pfrom->PushMessage("dsee", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, count, i, mn.lastTimeSeen, mn.protocolVersion);
-                }
+                // }
             } else if (vin == mn.vin) {
                 if(fDebugFS && fDebugNet) printf("dseg - Sending fortunastake entry - %s \n", mn.addr.ToString().c_str());
                 pfrom->PushMessage("dsee", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, count, i, mn.lastTimeSeen, mn.protocolVersion);
@@ -962,16 +963,17 @@ void CFortunaStake::Check(bool forceCheck)
     if(!unitTest){
         std::string vinError;
         if(!CheckFortunastakeVin(vin,vinError)) {
-                enabled = 3; //MN input was spent, disable checks for this MN
+                enabled = 3; // input not eligible, disable checks for this FS
                 if (fDebug) printf("error checking fortunastake %s: %s\n", vin.prevout.ToString().c_str(), vinError.c_str());
+                status = strprintf("vin %s not capable: %s", vin.prevout.ToString().c_str(), vinError.c_str());
                 return;
             }
         }
-
+    status = "OK";
     enabled = 1; // OK
 }
 
-bool CheckFortunastakeVin(CTxIn& vin, std::string& errorMessage) {
+bool CheckFortunastakeVin(CTxIn& vin, std::string& errorMessage, CBlockIndex* pindex) {
     CTxDB txdb("r");
     CTxIndex txindex;
     CTransaction ctx;
@@ -981,6 +983,15 @@ bool CheckFortunastakeVin(CTxIn& vin, std::string& errorMessage) {
     {
         errorMessage = "could not find transaction";
         return false;
+    } else {
+        if(mapBlockIndex.find(hashBlock) != mapBlockIndex.end())
+        {
+            int confirms = pindex->nHeight - mapBlockIndex[hashBlock]->nHeight;
+            if (confirms < FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY) {
+                errorMessage = strprintf("specified vin has only %d/%d more confirms",confirms,FORTUNASTAKE_MIN_CONFIRMATIONS_NOPAY);
+                return false;
+            }
+        }
     }
 
     CTxOut vout = ctx.vout[vin.prevout.n];
