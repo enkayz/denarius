@@ -47,7 +47,12 @@ FortunastakeManager::FortunastakeManager(QWidget *parent) :
     ui->stopButton->setEnabled(false);
     ui->copyAddressButton->setEnabled(false);
 
-    ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    ui->tableWidget->horizontalHeader()->resizeSection(0, 350);
+    ui->tableWidget->horizontalHeader()->resizeSection(1, 150);
+    ui->tableWidget->horizontalHeader()->resizeSection(2, 70);
+    ui->tableWidget->horizontalHeader()->resizeSection(3, 180);
+    ui->tableWidget->horizontalHeader()->resizeSection(3, 180);
+    ui->tableWidget->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Stretch);
     ui->tableWidget->setSortingEnabled(true);
     ui->tableWidget_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     ui->tableWidget_2->setSortingEnabled(true);
@@ -257,8 +262,26 @@ void FortunastakeManager::updateNodeList()
 
     BOOST_FOREACH(CFortunaStake mn, vecFortunastakes) 
     {
-        int mnRow = 0;
-        ui->tableWidget->insertRow(0);
+
+        bool bFound = false;
+        int nodeRow = 0;
+        for(int i=0; i < ui->tableWidget->rowCount(); i++)
+        {
+            if(ui->tableWidget->item(i, 0)->text() == QString::fromStdString(mn.addr.ToString()))
+            {
+                bFound = true;
+                nodeRow = i;
+                break;
+            }
+        }
+
+        if(nodeRow == 0 && !bFound)
+        {
+            ui->tableWidget->insertRow(ui->tableWidget->rowCount());
+            nodeRow = ui->tableWidget->rowCount()-1;
+        }
+
+        //ui->tableWidget->insertRow(0);
         int mnRank = GetFortunastakeRank(mn, pindexBest);
         int64_t value;
         double rate;
@@ -287,12 +310,12 @@ void FortunastakeManager::updateNodeList()
         CBitcoinAddress address2(address1);
         QTableWidgetItem *pubkeyItem = new QTableWidgetItem(QString::fromStdString(address2.ToString())); // +strprintf(" - %.2fD (%3.0f%%)", FormatMoney(value).c_str(), rate)
 
-        ui->tableWidget->setItem(mnRow, 0, addressItem);
-        ui->tableWidget->setItem(mnRow, 1, rankItem);
-        ui->tableWidget->setItem(mnRow, 2, activeItem);
-        ui->tableWidget->setItem(mnRow, 3, activeSecondsItem);
-        ui->tableWidget->setItem(mnRow, 4, lastSeenItem);
-        ui->tableWidget->setItem(mnRow, 5, pubkeyItem);
+        ui->tableWidget->setItem(nodeRow, 0, addressItem);
+        ui->tableWidget->setItem(nodeRow, 1, rankItem);
+        ui->tableWidget->setItem(nodeRow, 2, activeItem);
+        ui->tableWidget->setItem(nodeRow, 3, activeSecondsItem);
+        ui->tableWidget->setItem(nodeRow, 4, lastSeenItem);
+        ui->tableWidget->setItem(nodeRow, 5, pubkeyItem);
     }
 
     // calc length of average round
